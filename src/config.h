@@ -19,6 +19,15 @@ struct Config {
     int esp_box_g = 95;
     int esp_box_b = 255;
 
+    bool aimbot = false;
+    float aim_fov = 3.0f;
+    float aim_smooth = 6.0f;
+    int aim_key = 0xA0;
+    int aim_bone = 7;
+    bool aim_visible_only = true;
+    bool aim_pred = true;
+    float aim_lead = 0.02f;
+
     bool rage_bhop = false;
     int rage_bhop_key = 0x06;
     bool rage_autostrafe = false;

@@ -208,6 +208,8 @@ Camera Memory::read_camera() const {
     c.h = read<std::int32_t>(engine_base + ENGINE2::dwWindowHeight);
     c.team = read<std::uint8_t>(pawn + SCH::m_iTeamNum);
     c.vm = read_view_matrix();
+    c.sens = read_sensitivity();
+    c.ping = ctrl ? read<std::int32_t>(ctrl + SCH::m_iPing) : 20;
     return c;
 }
 
@@ -216,6 +218,23 @@ std::array<float, 16> Memory::read_view_matrix() const {
     std::array<float, 16> vm{};
     if (bytes.size() == 64) memcpy(vm.data(), bytes.data(), 64);
     return vm;
+}
+
+float Memory::read_sensitivity() const {
+    auto p = read_ptr(client_base + 0x23C9F18);
+    if (!p) return 2.5f;
+    auto v = read<float>(p + 0x58);
+    return (v > 0.05f && v < 20.0f) ? v : 2.5f;
+}
+
+void Memory::mouse_move(float dx, float dy) const {
+    INPUT inp{};
+    inp.type = INPUT_MOUSE;
+    inp.mi.dx = static_cast<LONG>(dx);
+    inp.mi.dy = static_cast<LONG>(dy);
+    inp.mi.dwFlags = MOUSEEVENTF_MOVE;
+    inp.mi.dwExtraInfo = 0x42424242;
+    SendInput(1, &inp, sizeof(inp));
 }
 
 void Memory::key_press(int vk) const {

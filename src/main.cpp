@@ -4,6 +4,7 @@
 #include "memory.h"
 #include "offsets.h"
 #include "esp.h"
+#include "aimbot.h"
 #include "movement.h"
 #define NOMINMAX
 #include <Windows.h>
@@ -87,11 +88,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             Sleep(100); continue;
         }
 
+        tick_aimbot(mem, cfg, cam, players, pawn);
         tick_movement(mem, cfg, pawn);
 
         overlay.begin_frame();
         if (overlay.is_open()) gui_draw(cfg, overlay.menu_open);
         draw_esp(mem, cam, players, cfg);
+        draw_fov_circle(cam, cfg);
 
         {
             ImDrawList* dl = ImGui::GetBackgroundDrawList();

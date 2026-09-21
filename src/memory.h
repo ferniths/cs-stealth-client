@@ -28,6 +28,8 @@ struct Camera {
     int w = 0, h = 0;
     int team = 0;
     std::array<float, 16> vm{};
+    float sens = 2.5f;
+    int ping = 20;
 };
 
 class Memory {
@@ -61,7 +63,9 @@ public:
     std::vector<Player> read_players(std::uintptr_t es) const;
     Camera read_camera() const;
     std::array<float, 16> read_view_matrix() const;
+    float read_sensitivity() const;
 
+    void mouse_move(float dx, float dy) const;
     void key_press(int vk) const;
     void key_release(int vk) const;
 
