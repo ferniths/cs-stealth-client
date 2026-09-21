@@ -64,62 +64,54 @@ static void tick_autostrafe(Memory& mem, std::uintptr_t pawn) {
 }
 
 // ============================================
-// COUNTER-STRAFE (NON-BLOCKING STATE MACHINE)
-// When shoot key pressed while moving, taps opposite
-// key to stop instantly for accurate shot.
-//
-// Frame 1: shoot pressed + moving → press opposite key
-// Frame 2: release opposite key
-// No Sleep() calls — runs across frames.
+// COUNTER-STRAFE (VELOCITY-BASED)
+// Detects when player releases movement key by
+// watching velocity drop, then taps opposite direction
+// for 1 frame to stop instantly.
 // ============================================
-enum class CSState { IDLE, TAPPING, RELEASING };
+static float g_cs_prev_speed = 0.0f;
+static bool g_cs_counter_active = false;
+static int g_cs_counter_frames = 0;
+static int g_cs_counter_key = 0;
 
-static CSState g_cs_state = CSState::IDLE;
-static int g_cs_opposite = 0;
-static int g_cs_frames = 0;
-
-static void tick_counterstrafe(Memory& mem, const Config& cfg) {
+static void tick_counterstrafe(Memory& mem, const Config& cfg, std::uintptr_t pawn) {
     if (cfg.rage_counterstrafe_key == 0) return;
 
     bool shoot = GetAsyncKeyState(cfg.rage_counterstrafe_key) & 0x8000;
-    bool a = GetAsyncKeyState('A') & 0x8000;
-    bool d = GetAsyncKeyState('D') & 0x8000;
-    bool w = GetAsyncKeyState('W') & 0x8000;
-    bool s = GetAsyncKeyState('S') & 0x8000;
-    bool moving = a || d || w || s;
+    auto vel = mem.read_vec3(pawn + SCH::m_vecVelocity);
+    float speed = std::sqrt(vel.x * vel.x + vel.y * vel.y);
 
-    switch (g_cs_state) {
-    case CSState::IDLE:
-        if (shoot && moving) {
-            // Determine opposite key
-            if (a) g_cs_opposite = 'D';
-            else if (d) g_cs_opposite = 'A';
-            else if (w) g_cs_opposite = 'S';
-            else if (s) g_cs_opposite = 'W';
-            else { g_cs_state = CSState::IDLE; return; }
-
-            mem.key_press(g_cs_opposite);
-            g_cs_frames = 0;
-            g_cs_state = CSState::TAPPING;
+    // If counter-strafe is active, count frames and release
+    if (g_cs_counter_active) {
+        g_cs_counter_frames++;
+        if (g_cs_counter_frames >= 1) {  // 1 frame tap
+            mem.key_release(g_cs_counter_key);
+            g_cs_counter_active = false;
         }
-        break;
-
-    case CSState::TAPPING:
-        g_cs_frames++;
-        if (g_cs_frames >= 3) {  // ~3 frames = ~50ms at 60fps
-            mem.key_release(g_cs_opposite);
-            g_cs_frames = 0;
-            g_cs_state = CSState::RELEASING;
-        }
-        break;
-
-    case CSState::RELEASING:
-        g_cs_frames++;
-        if (g_cs_frames >= 2) {  // Small cooldown
-            g_cs_state = CSState::IDLE;
-        }
-        break;
+        g_cs_prev_speed = speed;
+        return;
     }
+
+    // Detect speed drop (player released movement key)
+    // Speed drops by >30 u/s in one frame = key released
+    if (shoot && g_cs_prev_speed > 100.0f && (g_cs_prev_speed - speed) > 30.0f) {
+        // Player was moving fast and suddenly slowed = released key
+        // Tap opposite direction to counter remaining velocity
+        float vel_yaw = atan2f(vel.y, vel.x) * (180.0f / 3.14159265f);
+        float view_yaw = mem.read<float>(mem.client_base + CLIENT::dwViewAngles + 4);
+        float diff = normalize_yaw(vel_yaw - view_yaw);
+
+        if (std::abs(diff) > 10.0f) {
+            // Velocity is to the right of view = tap A (left)
+            // Velocity is to the left of view = tap D (right)
+            g_cs_counter_key = (diff > 0) ? 'A' : 'D';
+            mem.key_press(g_cs_counter_key);
+            g_cs_counter_active = true;
+            g_cs_counter_frames = 0;
+        }
+    }
+
+    g_cs_prev_speed = speed;
 }
 
 // ============================================
@@ -153,5 +145,5 @@ void tick_movement(Memory& mem, const Config& cfg, std::uintptr_t pawn) {
         tick_slowwalk(mem, pawn);
 
     if (cfg.rage_counterstrafe)
-        tick_counterstrafe(mem, cfg);
+        tick_counterstrafe(mem, cfg, pawn);
 }
