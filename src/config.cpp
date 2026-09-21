@@ -33,6 +33,7 @@ void Config::load(const std::string& path) {
     if (j.contains("aim_visible_only")) aim_visible_only = j["aim_visible_only"].get<bool>();
     if (j.contains("aim_pred")) aim_pred = j["aim_pred"].get<bool>();
     if (j.contains("aim_lead")) aim_lead = j["aim_lead"].get<float>();
+    if (j.contains("aim_fov_circle")) aim_fov_circle = j["aim_fov_circle"].get<bool>();
 
     if (j.contains("rage_bhop")) rage_bhop = j["rage_bhop"].get<bool>();
     if (j.contains("rage_bhop_key")) rage_bhop_key = j["rage_bhop_key"].get<int>();
@@ -55,7 +56,7 @@ void Config::save(const std::string& path) const {
     j["aimbot"] = aimbot; j["aim_fov"] = aim_fov; j["aim_smooth"] = aim_smooth;
     j["aim_key"] = aim_key; j["aim_bone"] = aim_bone;
     j["aim_visible_only"] = aim_visible_only; j["aim_pred"] = aim_pred;
-    j["aim_lead"] = aim_lead;
+    j["aim_lead"] = aim_lead; j["aim_fov_circle"] = aim_fov_circle;
 
     j["rage_bhop"] = rage_bhop; j["rage_bhop_key"] = rage_bhop_key;
     j["rage_autostrafe"] = rage_autostrafe;

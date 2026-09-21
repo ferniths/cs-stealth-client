@@ -27,6 +27,7 @@ struct Config {
     bool aim_visible_only = true;
     bool aim_pred = true;
     float aim_lead = 0.02f;
+    bool aim_fov_circle = false;
 
     bool rage_bhop = false;
     int rage_bhop_key = 0x06;

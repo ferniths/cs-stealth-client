@@ -147,8 +147,7 @@ void tick_aimbot(Memory& mem, Config& cfg, const Camera& cam,
 }
 
 void draw_fov_circle(const Camera& cam, const Config& cfg) {
-    if (!cfg.aimbot) return;
-    if (cfg.aim_key != 0 && !(GetAsyncKeyState(cfg.aim_key) & 0x8000)) return;
+    if (!cfg.aimbot || !cfg.aim_fov_circle) return;
 
     ImDrawList* draw = ImGui::GetBackgroundDrawList();
     ImVec2 center = ImVec2(cam.w * 0.5f, cam.h * 0.5f);

@@ -160,32 +160,8 @@ void gui_draw(Config& cfg, bool& menu_open) {
                 }
             }
 
-            section_header("Air");
-            toggle("Auto-Strafe", &cfg.rage_autostrafe);
-            toggle("Slow Walk", &cfg.rage_slowwalk);
-
-            section_header("Counter-Strafe");
-            toggle("Counter-Strafe", &cfg.rage_counterstrafe);
-            if (cfg.rage_counterstrafe) {
-                const char* cs_keys[] = { "None", "LMB", "RMouse", "LAlt", "LCtrl", "LShift" };
-                int csi = 0;
-                if (cfg.rage_counterstrafe_key == VK_LBUTTON) csi = 1;
-                else if (cfg.rage_counterstrafe_key == VK_RBUTTON) csi = 2;
-                else if (cfg.rage_counterstrafe_key == VK_LMENU) csi = 3;
-                else if (cfg.rage_counterstrafe_key == VK_LCONTROL) csi = 4;
-                else if (cfg.rage_counterstrafe_key == VK_LSHIFT) csi = 5;
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::Combo("Shoot Key", &csi, cs_keys, 6)) {
-                    switch (csi) {
-                    case 1: cfg.rage_counterstrafe_key = VK_LBUTTON; break;
-                    case 2: cfg.rage_counterstrafe_key = VK_RBUTTON; break;
-                    case 3: cfg.rage_counterstrafe_key = VK_LMENU; break;
-                    case 4: cfg.rage_counterstrafe_key = VK_LCONTROL; break;
-                    case 5: cfg.rage_counterstrafe_key = VK_LSHIFT; break;
-                    default: cfg.rage_counterstrafe_key = 0; break;
-                    }
-                }
-            }
+            section_header("Overlay");
+            toggle("FOV Circle", &cfg.aim_fov_circle);
             ImGui::EndTabItem();
         }
 
