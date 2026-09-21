@@ -17,6 +17,65 @@ static void section_header(const char* text) {
     ImGui::Separator();
 }
 
+static void esp_preview(const Config& cfg) {
+    ImGui::Spacing();
+    section_header("Preview");
+    ImVec2 p = ImGui::GetCursorScreenPos();
+    float w = ImGui::GetContentRegionAvail().x;
+    float h = 120.0f;
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(p, {p.x+w, p.y+h}, IM_COL32(10,10,20,255));
+    dl->AddRect({p.x,p.y},{p.x+w,p.y+h}, IM_COL32(40,40,60,255));
+
+    float cx = p.x + w * 0.5f;
+    float cy = p.y + h * 0.5f;
+    float bw = 50.0f, bh = 80.0f;
+    float bx = cx - bw * 0.5f;
+    float by = cy - bh * 0.5f;
+
+    ImU32 col = IM_COL32(cfg.esp_box_r, cfg.esp_box_g, cfg.esp_box_b, 255);
+    if (cfg.esp_box) {
+        if (cfg.esp_box_style == 0)
+            dl->AddRect({bx,by},{bx+bw,by+bh}, col);
+        else if (cfg.esp_box_style == 1) {
+            float c = 10.0f;
+            dl->AddLine({bx,by},{bx+c,by},col,1.5f); dl->AddLine({bx,by},{bx,by+c},col,1.5f);
+            dl->AddLine({bx+bw-c,by},{bx+bw,by},col,1.5f); dl->AddLine({bx+bw,by},{bx+bw,by+c},col,1.5f);
+            dl->AddLine({bx,by+bh-c},{bx,by+bh},col,1.5f); dl->AddLine({bx,by+bh},{bx+c,by+bh},col,1.5f);
+            dl->AddLine({bx+bw-c,by+bh},{bx+bw,by+bh},col,1.5f); dl->AddLine({bx+bw,by+bh-c},{bx+bw,by+bh},col,1.5f);
+        } else {
+            dl->AddRectFilled({bx+1,by+1},{bx+bw-1,by+bh-1}, IM_COL32(cfg.esp_box_r,cfg.esp_box_g,cfg.esp_box_b,50));
+            dl->AddRect({bx,by},{bx+bw,by+bh}, col);
+        }
+    }
+    if (cfg.esp_health) {
+        float hp_pct = 0.75f;
+        float hx = bx - 7.0f;
+        dl->AddRectFilled({hx,by},{hx+4,by+bh},IM_COL32(25,30,40,255));
+        float hp_h = bh * hp_pct;
+        dl->AddRectFilled({hx,by+bh-hp_h},{hx+4,by+bh},IM_COL32(40,230,100,255));
+    }
+    if (cfg.esp_name) {
+        dl->AddText({bx, by-14}, IM_COL32(255,255,255,200), "PlayerName");
+    }
+    if (cfg.esp_weapon) {
+        dl->AddText({bx, by+bh+4}, IM_COL32(200,200,200,200), "AK-47");
+    }
+    if (cfg.esp_distance) {
+        ImVec2 ts = ImGui::CalcTextSize("25m");
+        dl->AddText({cx-ts.x*0.5f, by+bh+18}, IM_COL32(200,200,200,200), "25m");
+    }
+    if (cfg.esp_head_dot) {
+        float head_y = by - 2.0f;
+        dl->AddCircleFilled({cx, head_y}, 3.0f, IM_COL32(255,255,255,200));
+    }
+    if (cfg.esp_snapline) {
+        dl->AddLine({cx, by+bh+36}, {cx, by+bh}, IM_COL32(155,95,255,100), 1.0f);
+    }
+
+    ImGui::Dummy({0, h + 4});
+}
+
 void gui_init() {
     ImGui::GetStyle().WindowRounding = 6.0f;
     ImGui::GetStyle().FrameRounding = 4.0f;
@@ -39,11 +98,15 @@ void gui_init() {
 }
 
 void gui_draw(Config& cfg, bool& menu_open) {
-    ImGui::SetNextWindowSize(ImVec2(320, 480), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(320, 520), ImGuiCond_Once);
     ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_Once);
     ImGui::Begin("Stealth Client", &menu_open, ImGuiWindowFlags_NoCollapse);
 
     ImGui::TextColored(ImVec4(155/255.0f, 95/255.0f, 255/255.0f, 1.0f), "Stealth Client v1.0");
+    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60);
+    if (ImGui::Button("Reset")) {
+        cfg.defaults();
+    }
     ImGui::Separator();
 
     if (ImGui::BeginTabBar("##tabs")) {
@@ -60,7 +123,6 @@ void gui_draw(Config& cfg, bool& menu_open) {
                 toggle("Weapon", &cfg.esp_weapon);
                 toggle("Distance", &cfg.esp_distance);
                 toggle("Snapline", &cfg.esp_snapline);
-                toggle("Tracer", &cfg.esp_tracer);
 
                 section_header("Style");
                 const char* styles[] = { "Full", "Corner", "Filled" };
@@ -73,6 +135,8 @@ void gui_draw(Config& cfg, bool& menu_open) {
                     cfg.esp_box_g = static_cast<int>(col[1] * 255);
                     cfg.esp_box_b = static_cast<int>(col[2] * 255);
                 }
+
+                esp_preview(cfg);
             }
             ImGui::EndTabItem();
         }
@@ -120,6 +184,7 @@ void gui_draw(Config& cfg, bool& menu_open) {
                 }
 
                 toggle("Visible Only", &cfg.aim_visible_only);
+                toggle("Aim Lock", &cfg.aim_lock);
 
                 section_header("Behavior");
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
@@ -131,6 +196,7 @@ void gui_draw(Config& cfg, bool& menu_open) {
                     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                     ImGui::SliderFloat("Lead", &cfg.aim_lead, 0.0f, 0.1f, "%.3f s");
                 }
+                toggle("Fire Rate Limit", &cfg.aim_fire_rate);
             }
             ImGui::EndTabItem();
         }

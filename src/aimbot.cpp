@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <random>
 #include <chrono>
+#include <unordered_map>
 
 static std::mt19937 aim_rng(std::random_device{}());
 
@@ -18,18 +19,41 @@ static bool w2s(const std::array<float, 16>& vm, float x, float y, float z,
     float rw = vm[12]*x + vm[13]*y + vm[14]*z + vm[15];
     if (rw < 0.01f) return false;
     float iw = 1.0f / rw;
-    sx = (w*0.5f) + 0.5f * rx * iw * w + 0.5f;
+    sx = (w*0.5f) + 0.05f * rx * iw * w;
     sy = (h*0.5f) - 0.5f * ry * iw * h + 0.5f;
     return true;
 }
 
-static float get_bullet_speed(int defidx) {
-    switch (defidx) {
-    case 1: case 2: case 3: case 4: case 26: case 27: case 28: case 30: case 33: case 44: case 61: case 63: case 64: return 2000.0f;
-    case 7: case 8: case 10: case 11: case 13: case 14: case 16: case 25: case 38: case 39: case 60: return 2800.0f;
-    case 9: case 40: return 1900.0f;
-    case 17: case 19: case 23: case 24: case 29: return 2400.0f;
-    default: return 2400.0f;
+static float get_fire_rate_ms(int weapon_id) {
+    switch (weapon_id) {
+    case 1:  return 450.0f;   // Deagle
+    case 2:  return 100.0f;   // Dual Berettas
+    case 3:  return 150.0f;   // 5-7
+    case 4:  return 150.0f;   // Glock
+    case 7:  return 100.0f;   // AK-47
+    case 8:  return 90.0f;    // AUG
+    case 9:  return 1500.0f;  // AWP
+    case 10: return 90.0f;    // FAMAS
+    case 11: return 1500.0f;  // G3SG1
+    case 13: return 90.0f;    // Galil
+    case 16: return 90.0f;    // M4A4
+    case 17: return 70.0f;    // MAC-10
+    case 19: return 70.0f;    // MP9
+    case 23: return 80.0f;    // MP7
+    case 24: return 80.0f;    // UMP
+    case 26: return 800.0f;   // Nova
+    case 28: return 150.0f;   // P250
+    case 29: return 65.0f;    // P90
+    case 33: return 800.0f;   // MAG-7
+    case 38: return 90.0f;    // SCAR
+    case 39: return 90.0f;    // SG553
+    case 40: return 1250.0f;  // SSG
+    case 42: return 400.0f;   // Knife
+    case 60: return 90.0f;    // M4A1-S
+    case 61: return 170.0f;   // USP
+    case 63: return 100.0f;   // CZ
+    case 64: return 825.0f;   // R8
+    default: return 100.0f;
     }
 }
 
@@ -37,11 +61,16 @@ static auto aim_start = std::chrono::steady_clock::now();
 static auto aim_last_target = std::uintptr_t(0);
 static float aim_react = 0.05f;
 static auto aim_react_start = std::chrono::steady_clock::now();
+static auto aim_last_shot = std::chrono::steady_clock::now();
+static int aim_locked_weapon = 0;
 
 void tick_aimbot(Memory& mem, Config& cfg, const Camera& cam,
                  const std::vector<Player>& players, std::uintptr_t local_pawn) {
     if (!cfg.aimbot) return;
-    if (cfg.aim_key != 0 && !(GetAsyncKeyState(cfg.aim_key) & 0x8000)) return;
+    if (cfg.aim_key != 0 && !(GetAsyncKeyState(cfg.aim_key) & 0x8000)) {
+        aim_last_target = 0;
+        return;
+    }
 
     auto now = std::chrono::steady_clock::now();
     float dt = std::chrono::duration<float>(now - aim_start).count();
@@ -107,10 +136,28 @@ void tick_aimbot(Memory& mem, Config& cfg, const Camera& cam,
         }
     }
 
-    if (!best_pawn) return;
+    if (!cfg.aim_lock && !best_pawn) return;
+    if (cfg.aim_lock && !best_pawn) {
+        best_pawn = aim_last_target;
+        if (!best_pawn) return;
+    }
+
+    if (cfg.aim_lock && aim_last_target) {
+        bool target_alive = false;
+        for (const auto& p : players) {
+            if (p.pawn == aim_last_target && p.alive) {
+                target_alive = true;
+                break;
+            }
+        }
+        if (!target_alive) {
+            aim_last_target = 0;
+            return;
+        }
+    }
 
     float d = std::sqrt((best_sx-cxp)*(best_sx-cxp) + (best_sy-cyp)*(best_sy-cyp));
-    if (d < 2.5f) return;
+    if (!cfg.aim_lock && d < 2.5f) return;
 
     if (best_pawn != aim_last_target) {
         aim_last_target = best_pawn;
@@ -120,7 +167,13 @@ void tick_aimbot(Memory& mem, Config& cfg, const Camera& cam,
     float elapsed = std::chrono::duration<float>(now - aim_react_start).count();
     if (elapsed < aim_react) return;
 
-    if (d < 4.0f) return;
+    if (cfg.aim_fire_rate) {
+        float fire_ms = get_fire_rate_ms(aim_locked_weapon);
+        float since_shot = std::chrono::duration<float>(now - aim_last_shot).count() * 1000.0f;
+        if (since_shot < fire_ms) return;
+    }
+
+    if (!cfg.aim_lock && d < 4.0f) return;
 
     float sens = cam.sens;
     float k = (1.0f / (cam.w * 0.5f)) / (sens * 0.001221730f) * 4.0f;

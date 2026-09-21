@@ -3,6 +3,19 @@
 #include <json.hpp>
 using json = nlohmann::json;
 
+void Config::defaults() {
+    esp = true; esp_box = true; esp_name = true; esp_health = true;
+    esp_visible_only = false; esp_skeleton = false; esp_tracer = false;
+    esp_distance = false; esp_snapline = false; esp_head_dot = false;
+    esp_weapon = false; esp_box_style = 0;
+    esp_box_r = 155; esp_box_g = 95; esp_box_b = 255;
+    aimbot = false; aim_fov = 3.0f; aim_smooth = 6.0f;
+    aim_key = 0xA0; aim_bone = 7; aim_visible_only = true;
+    aim_pred = true; aim_lead = 0.02f; aim_fov_circle = false;
+    aim_lock = false; aim_fire_rate = true;
+    rage_bhop = false; rage_bhop_key = 0x06;
+}
+
 void Config::load(const std::string& path) {
     std::ifstream f(path);
     if (!f.is_open()) return;
@@ -34,13 +47,11 @@ void Config::load(const std::string& path) {
     if (j.contains("aim_pred")) aim_pred = j["aim_pred"].get<bool>();
     if (j.contains("aim_lead")) aim_lead = j["aim_lead"].get<float>();
     if (j.contains("aim_fov_circle")) aim_fov_circle = j["aim_fov_circle"].get<bool>();
+    if (j.contains("aim_lock")) aim_lock = j["aim_lock"].get<bool>();
+    if (j.contains("aim_fire_rate")) aim_fire_rate = j["aim_fire_rate"].get<bool>();
 
     if (j.contains("rage_bhop")) rage_bhop = j["rage_bhop"].get<bool>();
     if (j.contains("rage_bhop_key")) rage_bhop_key = j["rage_bhop_key"].get<int>();
-    if (j.contains("rage_autostrafe")) rage_autostrafe = j["rage_autostrafe"].get<bool>();
-    if (j.contains("rage_counterstrafe")) rage_counterstrafe = j["rage_counterstrafe"].get<bool>();
-    if (j.contains("rage_counterstrafe_key")) rage_counterstrafe_key = j["rage_counterstrafe_key"].get<int>();
-    if (j.contains("rage_slowwalk")) rage_slowwalk = j["rage_slowwalk"].get<bool>();
 }
 
 void Config::save(const std::string& path) const {
@@ -57,12 +68,9 @@ void Config::save(const std::string& path) const {
     j["aim_key"] = aim_key; j["aim_bone"] = aim_bone;
     j["aim_visible_only"] = aim_visible_only; j["aim_pred"] = aim_pred;
     j["aim_lead"] = aim_lead; j["aim_fov_circle"] = aim_fov_circle;
+    j["aim_lock"] = aim_lock; j["aim_fire_rate"] = aim_fire_rate;
 
     j["rage_bhop"] = rage_bhop; j["rage_bhop_key"] = rage_bhop_key;
-    j["rage_autostrafe"] = rage_autostrafe;
-    j["rage_counterstrafe"] = rage_counterstrafe;
-    j["rage_counterstrafe_key"] = rage_counterstrafe_key;
-    j["rage_slowwalk"] = rage_slowwalk;
 
     std::ofstream f(path);
     if (f.is_open()) f << j.dump(2) << std::endl;

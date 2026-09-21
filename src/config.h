@@ -28,14 +28,13 @@ struct Config {
     bool aim_pred = true;
     float aim_lead = 0.02f;
     bool aim_fov_circle = false;
+    bool aim_lock = false;
+    bool aim_fire_rate = true;
 
     bool rage_bhop = false;
     int rage_bhop_key = 0x06;
-    bool rage_autostrafe = false;
-    bool rage_counterstrafe = false;
-    int rage_counterstrafe_key = 0;
-    bool rage_slowwalk = false;
 
+    void defaults();
     void load(const std::string& path);
     void save(const std::string& path) const;
 };

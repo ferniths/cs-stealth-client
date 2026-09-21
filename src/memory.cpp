@@ -3,6 +3,7 @@
 #include "offsets.h"
 #include <tlhelp32.h>
 #include <algorithm>
+#include <chrono>
 
 static DWORD find_pid(const wchar_t* name) {
     HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -129,6 +130,7 @@ Player Memory::read_player(std::uintptr_t es, std::uintptr_t idx) const {
     p.team = read<std::uint8_t>(pawn + SCH::m_iTeamNum);
     if (p.team != 2 && p.team != 3) return {};
     p.alive = (life == 0);
+    p.dormant = read<std::uint8_t>(pawn + 0x8) != 0;
     p.spotted = read<std::uint8_t>(pawn + SCH::m_entitySpottedState + SCH::m_bSpotted) != 0;
     auto flags = read<std::uint32_t>(pawn + SCH::m_fFlags);
 
@@ -146,15 +148,6 @@ Player Memory::read_player(std::uintptr_t es, std::uintptr_t idx) const {
     if (flags & 0x06) {
         auto mov = read_ptr(pawn + SCH::m_pMovementServices);
         if (mov) p.duck = std::clamp(read<float>(mov + SCH::m_flDuckAmount), 0.0f, 1.0f);
-    }
-
-    auto hctrl = read<std::uint32_t>(pawn + SCH::m_hOriginalController);
-    if (hctrl && (hctrl & 0x7FFF) != 0 && (hctrl & 0x7FFF) != 0x7FFF) {
-        auto ctrl = entity_from_handle(hctrl);
-        if (ctrl) {
-            auto nptr = read_ptr(ctrl + SCH::m_sSanitizedPlayerName);
-            if (nptr) p.name = read_string(nptr, 31);
-        }
     }
 
     p.vel = read_vec3(pawn + SCH::m_vecVelocity);
@@ -181,7 +174,7 @@ std::vector<Player> Memory::read_players(std::uintptr_t es) const {
     highest = std::min(highest, 1024u);
     for (std::uintptr_t i = 1; i <= highest; ++i) {
         auto p = read_player(es, i);
-        if (p.pawn && p.health > 0) out.push_back(p);
+        if (p.pawn && p.health > 0 && !p.dormant) out.push_back(p);
     }
     return out;
 }

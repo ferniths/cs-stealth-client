@@ -36,6 +36,14 @@ static bool w2s(const std::array<float, 16>& vm, const Vec3& pos, float& sx, flo
     return true;
 }
 
+static ImU32 health_color(int hp) {
+    float t = std::clamp(hp / 100.0f, 0.0f, 1.0f);
+    int r = static_cast<int>(255 * (1.0f - t) + 40 * t);
+    int g = static_cast<int>(60 * (1.0f - t) + 230 * t);
+    int b = static_cast<int>(60 * (1.0f - t) + 100 * t);
+    return IM_COL32(r, g, b, 255);
+}
+
 void draw_esp(Memory& mem, const Camera& cam, const std::vector<Player>& players, const Config& cfg) {
     if (!cfg.esp) return;
     ImDrawList* d = ImGui::GetBackgroundDrawList();
@@ -86,10 +94,19 @@ void draw_esp(Memory& mem, const Camera& cam, const std::vector<Player>& players
         if (cfg.esp_health) {
             float hp_pct = std::clamp(p.health/100.0f, 0.0f, 1.0f);
             float bx = x - 7.0f;
-            d->AddRectFilled({bx,y},{bx+3,y+hgt},IM_COL32(25,30,40,255));
+            d->AddRectFilled({bx,y},{bx+4,y+hgt},IM_COL32(25,30,40,255));
             float bh = std::max(2.0f, hgt * hp_pct);
-            ImU32 hc = p.health > 60 ? IM_COL32(110,220,150,255) : p.health > 30 ? IM_COL32(240,200,90,255) : IM_COL32(255,90,90,255);
-            d->AddRectFilled({bx, y+hgt-bh},{bx+3,y+hgt},hc);
+
+            int segments = static_cast<int>(bh);
+            if (segments < 1) segments = 1;
+            float seg_h = bh / segments;
+            for (int i = 0; i < segments; i++) {
+                float seg_hp = hp_pct * 100.0f * (static_cast<float>(i + 1) / segments);
+                ImU32 sc = health_color(static_cast<int>(seg_hp));
+                float sy_start = y + hgt - (i + 1) * seg_h;
+                float sy_end = y + hgt - i * seg_h;
+                d->AddRectFilled({bx, sy_start}, {bx+4, sy_end}, sc);
+            }
         }
 
         if (cfg.esp_name && !p.name.empty()) {
@@ -119,7 +136,11 @@ void draw_esp(Memory& mem, const Camera& cam, const std::vector<Player>& players
 
         if (cfg.esp_tracer) d->AddLine({disp.x*0.5f,disp.y},{fsx,fsy},IM_COL32(255,255,255,80),1.0f);
         if (cfg.esp_snapline) d->AddLine({disp.x*0.5f,disp.y*0.75f},{fsx,fsy},IM_COL32(155,95,255,100),1.0f);
-        if (cfg.esp_head_dot) d->AddCircleFilled({hsx,hsy},3.0f,IM_COL32(255,255,255,200));
+        if (cfg.esp_head_dot) {
+            float head_r = std::max(3.0f, hgt * 0.035f);
+            d->AddCircleFilled({hsx,hsy}, head_r, IM_COL32(255,255,255,200));
+            d->AddCircle({hsx,hsy}, head_r, IM_COL32(155,95,255,160), 0, 1.0f);
+        }
 
         if (cfg.esp_weapon && p.weapon_id > 0) {
             const char* wn = weapon_name(p.weapon_id);

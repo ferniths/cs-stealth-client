@@ -10,6 +10,7 @@
 #include <Windows.h>
 #include "imgui.h"
 #include <string>
+#include <chrono>
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     Overlay overlay;
@@ -24,6 +25,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     gui_init();
 
     bool running = true;
+    auto last_save = std::chrono::steady_clock::now();
 
     while (running) {
         if (GetAsyncKeyState(VK_DELETE) & 1) { running = false; break; }
@@ -99,12 +101,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         {
             ImDrawList* dl = ImGui::GetBackgroundDrawList();
             ImVec2 d = ImGui::GetIO().DisplaySize;
-            dl->AddRectFilled({8, d.y-22}, {152, d.y-4}, IM_COL32(14,10,28,200));
+            dl->AddRectFilled({8, d.y-22}, {168, d.y-4}, IM_COL32(14,10,28,200));
             dl->AddText({12, d.y-20}, IM_COL32(155,95,255,255), "Stealth Client v1.0");
+            dl->AddText({d.x - 120, d.y-20}, IM_COL32(120,120,120,255), "[Insert] Menu");
         }
 
         overlay.end_frame();
-        cfg.save("config.json");
+
+        auto now = std::chrono::steady_clock::now();
+        float save_dt = std::chrono::duration<float>(now - last_save).count();
+        if (save_dt > 2.0f) {
+            cfg.save("config.json");
+            last_save = now;
+        }
+
         Sleep(1);
     }
 

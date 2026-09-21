@@ -13,6 +13,7 @@ struct Player {
     std::uintptr_t pawn = 0;
     int health = 0;
     bool alive = false;
+    bool dormant = false;
     int team = 0;
     bool spotted = false;
     float duck = 0.0f;
