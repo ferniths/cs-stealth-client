@@ -163,20 +163,20 @@ void tick_aimbot(Memory& mem, Config& cfg, const Camera& cam,
     float dx = (best_sx - cxp) * k;
     float dy = (best_sy - cyp) * k;
 
-    float smoothness = std::clamp(cfg.aim_smooth / 10.0f, 0.25f, 0.95f);
-    float base = std::clamp(1.0f / cfg.aim_smooth, 0.05f, 0.9f);
-    float step = std::clamp(base * 1.2f * std::min(1.0f, dt * 120.0f), 0.02f, 0.95f);
+    float smoothness = std::clamp(cfg.aim_smooth / 10.0f, 0.15f, 0.95f);
+    float base = std::clamp(1.0f / cfg.aim_smooth, 0.05f, 1.0f);
+    float step = std::clamp(base * 1.5f * std::min(1.0f, dt * 120.0f), 0.03f, 0.98f);
     float dist_ratio = std::min(1.0f, d / fov_px);
-    float noise_amt = (0.03f + 0.04f * dist_ratio) * smoothness;
+    float noise_amt = (0.02f + 0.03f * dist_ratio) * smoothness;
 
     float ndx, ndy;
     if (d < 8.0f) {
-        float micro = (1.0f - d / 8.0f) * 0.6f * smoothness;
+        float micro = (1.0f - d / 8.0f) * 0.4f * smoothness;
         ndx = std::normal_distribution<float>(dx * step, std::abs(dx * step) * noise_amt + micro)(aim_rng);
         ndy = std::normal_distribution<float>(dy * step, std::abs(dy * step) * noise_amt + micro)(aim_rng);
     } else {
-        ndx = std::normal_distribution<float>(dx * step, std::abs(dx * step) * noise_amt + 0.01f)(aim_rng);
-        ndy = std::normal_distribution<float>(dy * step, std::abs(dy * step) * noise_amt + 0.01f)(aim_rng);
+        ndx = std::normal_distribution<float>(dx * step, std::abs(dx * step) * noise_amt + 0.008f)(aim_rng);
+        ndy = std::normal_distribution<float>(dy * step, std::abs(dy * step) * noise_amt + 0.008f)(aim_rng);
     }
 
     mem.mouse_move(ndx, ndy);

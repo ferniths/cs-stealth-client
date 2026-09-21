@@ -209,7 +209,7 @@ void gui_draw(Config& cfg, bool& menu_open) {
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::SliderFloat("FOV", &cfg.aim_fov, 0.5f, 20.0f, "%.1f deg");
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::SliderFloat("Smooth", &cfg.aim_smooth, 1.0f, 30.0f, "%.1f");
+                ImGui::SliderFloat("Smooth", &cfg.aim_smooth, 0.1f, 30.0f, "%.1f");
                 toggle("Prediction", &cfg.aim_pred);
                 if (cfg.aim_pred) {
                     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
