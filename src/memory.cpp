@@ -42,7 +42,7 @@ static std::uintptr_t find_module(HANDLE hProc, DWORD pid, const wchar_t* name) 
 bool Memory::attach() {
     pid = find_pid(L"cs2.exe");
     if (!pid) return false;
-    hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION, FALSE, pid);
+    hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
     if (!hProcess || hProcess == INVALID_HANDLE_VALUE) return false;
     client_base = find_module(hProcess, pid, L"client.dll");
     engine_base = find_module(hProcess, pid, L"engine2.dll");
@@ -150,7 +150,14 @@ Player Memory::read_player(std::uintptr_t es, std::uintptr_t idx) const {
         if (mov) p.duck = std::clamp(read<float>(mov + SCH::m_flDuckAmount), 0.0f, 1.0f);
     }
 
-    p.vel = read_vec3(pawn + SCH::m_vecVelocity);
+    auto hctrl = read<std::uint32_t>(pawn + SCH::m_hOriginalController);
+    if (hctrl && (hctrl & 0x7FFF) != 0 && (hctrl & 0x7FFF) != 0x7FFF) {
+        auto ctrl = entity_from_handle(hctrl);
+        if (ctrl) {
+            auto nptr = read_ptr(ctrl + SCH::m_sSanitizedPlayerName);
+            if (nptr) p.name = read_string(nptr, 31);
+        }
+    }
 
     auto wsv = read_ptr(pawn + SCH::m_pWeaponServices);
     if (wsv) {
@@ -201,8 +208,6 @@ Camera Memory::read_camera() const {
     c.h = read<std::int32_t>(engine_base + ENGINE2::dwWindowHeight);
     c.team = read<std::uint8_t>(pawn + SCH::m_iTeamNum);
     c.vm = read_view_matrix();
-    c.sens = read_sensitivity();
-    c.ping = ctrl ? read<std::int32_t>(ctrl + SCH::m_iPing) : 20;
     return c;
 }
 
@@ -211,38 +216,4 @@ std::array<float, 16> Memory::read_view_matrix() const {
     std::array<float, 16> vm{};
     if (bytes.size() == 64) memcpy(vm.data(), bytes.data(), 64);
     return vm;
-}
-
-float Memory::read_sensitivity() const {
-    auto p = read_ptr(client_base + 0x23C9F18);
-    if (!p) return 2.5f;
-    auto v = read<float>(p + 0x58);
-    return (v > 0.05f && v < 20.0f) ? v : 2.5f;
-}
-
-void Memory::mouse_move(float dx, float dy) const {
-    INPUT inp{};
-    inp.type = INPUT_MOUSE;
-    inp.mi.dx = static_cast<LONG>(dx);
-    inp.mi.dy = static_cast<LONG>(dy);
-    inp.mi.dwFlags = MOUSEEVENTF_MOVE;
-    inp.mi.dwExtraInfo = 0x42424242;
-    SendInput(1, &inp, sizeof(inp));
-}
-
-void Memory::key_press(int vk) const {
-    INPUT inp{};
-    inp.type = INPUT_KEYBOARD;
-    inp.ki.wVk = static_cast<WORD>(vk);
-    inp.ki.dwExtraInfo = 0x42424242;
-    SendInput(1, &inp, sizeof(inp));
-}
-
-void Memory::key_release(int vk) const {
-    INPUT inp{};
-    inp.type = INPUT_KEYBOARD;
-    inp.ki.wVk = static_cast<WORD>(vk);
-    inp.ki.dwFlags = KEYEVENTF_KEYUP;
-    inp.ki.dwExtraInfo = 0x42424242;
-    SendInput(1, &inp, sizeof(inp));
 }

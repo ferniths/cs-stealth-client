@@ -9,8 +9,6 @@ add_executable(StealthClient WIN32
     src/memory.cpp
     src/overlay.cpp
     src/esp.cpp
-    src/aimbot.cpp
-    src/movement.cpp
     src/config.cpp
     src/gui.cpp
     src/imgui/imgui.cpp

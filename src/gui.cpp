@@ -117,7 +117,7 @@ void gui_init() {
 }
 
 void gui_draw(Config& cfg, bool& menu_open) {
-    ImGui::SetNextWindowSize(ImVec2(310, 480), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(310, 460), ImGuiCond_Once);
     ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_Once);
 
     ImGui::Begin("Stealth Client", &menu_open, ImGuiWindowFlags_NoCollapse);
@@ -142,6 +142,7 @@ void gui_draw(Config& cfg, bool& menu_open) {
                 toggle("Weapon", &cfg.esp_weapon);
                 toggle("Distance", &cfg.esp_distance);
                 toggle("Snapline", &cfg.esp_snapline);
+                toggle("Tracer", &cfg.esp_tracer);
 
                 section("Style");
                 const char* styles[] = { "Full", "Corner", "Filled" };
@@ -158,95 +159,6 @@ void gui_draw(Config& cfg, bool& menu_open) {
 
                 esp_preview(cfg);
             }
-            ImGui::EndTabItem();
-        }
-
-        if (ImGui::BeginTabItem("  Aim  ")) {
-            toggle("Enable Aimbot", &cfg.aimbot);
-            if (cfg.aimbot) {
-                section("Target");
-                const char* keys[] = { "None", "RMouse", "LAlt", "LCtrl", "LShift", "Mouse4", "Mouse5" };
-                int ki = 0;
-                if (cfg.aim_key == VK_RBUTTON) ki = 1;
-                else if (cfg.aim_key == VK_LMENU) ki = 2;
-                else if (cfg.aim_key == VK_LCONTROL) ki = 3;
-                else if (cfg.aim_key == VK_LSHIFT) ki = 4;
-                else if (cfg.aim_key == 0x06) ki = 5;
-                else if (cfg.aim_key == 0x07) ki = 6;
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::Combo("Keybind", &ki, keys, 7)) {
-                    switch (ki) {
-                    case 1: cfg.aim_key = VK_RBUTTON; break;
-                    case 2: cfg.aim_key = VK_LMENU; break;
-                    case 3: cfg.aim_key = VK_LCONTROL; break;
-                    case 4: cfg.aim_key = VK_LSHIFT; break;
-                    case 5: cfg.aim_key = 0x06; break;
-                    case 6: cfg.aim_key = 0x07; break;
-                    default: cfg.aim_key = 0; break;
-                    }
-                }
-
-                const char* bones[] = { "Head", "Neck", "Chest", "Stomach" };
-                int bi = 0;
-                if (cfg.aim_bone == 7) bi = 0;
-                else if (cfg.aim_bone == 6) bi = 1;
-                else if (cfg.aim_bone == 4) bi = 2;
-                else if (cfg.aim_bone == 3) bi = 3;
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::Combo("Bone", &bi, bones, 4)) {
-                    switch (bi) {
-                    case 0: cfg.aim_bone = 7; break;
-                    case 1: cfg.aim_bone = 6; break;
-                    case 2: cfg.aim_bone = 4; break;
-                    case 3: cfg.aim_bone = 3; break;
-                    }
-                }
-
-                toggle("Visible Only", &cfg.aim_visible_only);
-                toggle("Aim Lock", &cfg.aim_lock);
-
-                section("Behavior");
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::SliderFloat("FOV", &cfg.aim_fov, 0.5f, 20.0f, "%.1f deg");
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::SliderFloat("Smooth", &cfg.aim_smooth, 0.1f, 30.0f, "%.1f");
-                toggle("Prediction", &cfg.aim_pred);
-                if (cfg.aim_pred) {
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    ImGui::SliderFloat("Lead", &cfg.aim_lead, 0.0f, 0.1f, "%.3f s");
-                }
-                toggle("Fire Rate Limit", &cfg.aim_fire_rate);
-            }
-            ImGui::EndTabItem();
-        }
-
-        if (ImGui::BeginTabItem("  Misc  ")) {
-            section("Bunny Hop");
-            toggle("Auto Bhop", &cfg.rage_bhop);
-            if (cfg.rage_bhop) {
-                const char* keys[] = { "None", "Mouse4", "Mouse5", "LCtrl", "LAlt", "Space", "V", "B" };
-                int bki = 0;
-                if (cfg.rage_bhop_key == 0x06) bki = 1;
-                else if (cfg.rage_bhop_key == 0x07) bki = 2;
-                else if (cfg.rage_bhop_key == VK_LCONTROL) bki = 3;
-                else if (cfg.rage_bhop_key == VK_LMENU) bki = 4;
-                else if (cfg.rage_bhop_key == VK_SPACE) bki = 5;
-                else if (cfg.rage_bhop_key == 'V') bki = 6;
-                else if (cfg.rage_bhop_key == 'B') bki = 7;
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::Combo("Bhop Key", &bki, keys, 8)) {
-                    switch (bki) {
-                    case 1: cfg.rage_bhop_key = 0x06; break; case 2: cfg.rage_bhop_key = 0x07; break;
-                    case 3: cfg.rage_bhop_key = VK_LCONTROL; break; case 4: cfg.rage_bhop_key = VK_LMENU; break;
-                    case 5: cfg.rage_bhop_key = VK_SPACE; break; case 6: cfg.rage_bhop_key = 'V'; break;
-                    case 7: cfg.rage_bhop_key = 'B'; break; default: cfg.rage_bhop_key = 0; break;
-                    }
-                }
-            }
-
-            section("Overlay");
-            toggle("FOV Circle", &cfg.aim_fov_circle);
-
             ImGui::EndTabItem();
         }
 
