@@ -2,44 +2,53 @@
 #include <cstdint>
 
 namespace CLIENT {
-    constexpr std::uintptr_t dwLocalPlayerController = 0x25324D8;
-    constexpr std::uintptr_t dwLocalPlayerPawn       = 0x255B598;
-    constexpr std::uintptr_t dwGameEntitySystem       = 0x2710038;
-    constexpr std::uintptr_t dwViewAngles             = 0x2571108;
-    constexpr std::uintptr_t dwViewMatrix             = 0x25608E0;
-    constexpr std::uintptr_t dwHighestEntityIndex     = 0x2120;
-    constexpr std::uintptr_t dwChunkPointers          = 0x10;
-    constexpr std::uintptr_t dwSlotStride             = 0x70;
+    extern std::uintptr_t dwLocalPlayerController;
+    extern std::uintptr_t dwLocalPlayerPawn;
+    extern std::uintptr_t dwGameEntitySystem;
+    extern std::uintptr_t dwViewAngles;
+    extern std::uintptr_t dwViewMatrix;
+    extern std::uintptr_t dwHighestEntityIndex;
+    extern std::uintptr_t dwChunkPointers;
+    extern std::uintptr_t dwSlotStride;
 }
 
 namespace ENGINE2 {
-    constexpr std::uintptr_t dwWindowWidth            = 0x91E4D8;
-    constexpr std::uintptr_t dwWindowHeight           = 0x91E4DC;
+    extern std::uintptr_t dwWindowWidth;
+    extern std::uintptr_t dwWindowHeight;
 }
 
 namespace SCH {
-    constexpr std::uintptr_t m_pGameSceneNode         = 0x330;
-    constexpr std::uintptr_t m_iHealth                = 0x34C;
-    constexpr std::uintptr_t m_vecVelocity            = 0x430;
-    constexpr std::uintptr_t m_lifeState              = 0x354;
-    constexpr std::uintptr_t m_iTeamNum               = 0x3E7;
-    constexpr std::uintptr_t m_fFlags                 = 0x3F4;
-    constexpr std::uintptr_t m_vecAbsOrigin           = 0xC8;
-    constexpr std::uintptr_t m_flDuckAmount           = 0x40C;
-    constexpr std::uintptr_t m_pMovementServices      = 0x1330;
-    constexpr std::uintptr_t m_hOriginalController    = 0x1560;
-    constexpr std::uintptr_t m_entitySpottedState     = 0x1E88;
-    constexpr std::uintptr_t m_bSpotted               = 0x8;
-    constexpr std::uintptr_t m_hPlayerPawn            = 0x92C;
-    constexpr std::uintptr_t m_sSanitizedPlayerName   = 0x878;
-    constexpr std::uintptr_t m_pWeaponServices        = 0x12F0;
-    constexpr std::uintptr_t m_hActiveWeapon          = 0x60;
-    constexpr std::uintptr_t m_AttributeManager       = 0x1290;
-    constexpr std::uintptr_t m_Item                   = 0x50;
-    constexpr std::uintptr_t m_iItemDefinitionIndex   = 0x1BA;
-    constexpr std::uintptr_t m_modelState             = 0x140;
-    constexpr std::uintptr_t m_iPing                  = 0x838;
-    constexpr std::uintptr_t m_pCameraServices        = 0x1328;
-    constexpr std::uintptr_t m_vecCsViewPunchAngle    = 0x48;
-    constexpr std::uintptr_t m_nButtons               = 0x50;
+    extern std::uintptr_t m_pGameSceneNode;
+    extern std::uintptr_t m_iHealth;
+    extern std::uintptr_t m_vecVelocity;
+    extern std::uintptr_t m_lifeState;
+    extern std::uintptr_t m_iTeamNum;
+    extern std::uintptr_t m_fFlags;
+    extern std::uintptr_t m_vecAbsOrigin;
+    extern std::uintptr_t m_flDuckAmount;
+    extern std::uintptr_t m_pMovementServices;
+    extern std::uintptr_t m_hOriginalController;
+    extern std::uintptr_t m_entitySpottedState;
+    extern std::uintptr_t m_bSpotted;
+    extern std::uintptr_t m_hPlayerPawn;
+    extern std::uintptr_t m_sSanitizedPlayerName;
+    extern std::uintptr_t m_pWeaponServices;
+    extern std::uintptr_t m_hActiveWeapon;
+    extern std::uintptr_t m_AttributeManager;
+    extern std::uintptr_t m_Item;
+    extern std::uintptr_t m_iItemDefinitionIndex;
+    extern std::uintptr_t m_modelState;
+    extern std::uintptr_t m_iPing;
+    extern std::uintptr_t m_pCameraServices;
+    extern std::uintptr_t m_vecCsViewPunchAngle;
+    extern std::uintptr_t m_nButtons;
+    extern std::uintptr_t m_bDormant;
 }
+
+// Resolve offsets at launch. Tries: cache -> download -> pattern scan -> hardcoded.
+// Returns true if dynamic resolution succeeded (download or pattern scan).
+bool resolve_offsets();
+
+// Call after Memory::attach() to pattern-scan using the attached process.
+// Returns true if pattern scan succeeded.
+bool resolve_offsets_runtime(void* hProcess, std::uintptr_t client_base, std::uintptr_t engine_base);

@@ -130,7 +130,8 @@ Player Memory::read_player(std::uintptr_t es, std::uintptr_t idx) const {
     p.team = read<std::uint8_t>(pawn + SCH::m_iTeamNum);
     if (p.team != 2 && p.team != 3) return {};
     p.alive = (life == 0);
-    p.dormant = read<std::uint8_t>(pawn + 0x8) != 0;
+    auto sn0 = read_ptr(pawn + SCH::m_pGameSceneNode);
+    p.dormant = sn0 ? (read<std::uint8_t>(sn0 + SCH::m_bDormant) != 0) : false;
     p.spotted = read<std::uint8_t>(pawn + SCH::m_entitySpottedState + SCH::m_bSpotted) != 0;
     auto flags = read<std::uint32_t>(pawn + SCH::m_fFlags);
 

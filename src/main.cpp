@@ -22,8 +22,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     cfg.load("config.json");
     gui_init();
 
+    bool downloaded = resolve_offsets();
+
     bool running = true;
     auto last_save = std::chrono::steady_clock::now();
+    bool offsets_resolved = downloaded;
 
     while (running) {
         if (GetAsyncKeyState(VK_DELETE) & 1) { running = false; break; }
@@ -35,7 +38,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             overlay.end_frame();
             Sleep(1000);
             if (!mem.attach()) { Sleep(100); continue; }
+            if (!downloaded) offsets_resolved = false;
             continue;
+        }
+
+        if (!offsets_resolved) {
+            if (resolve_offsets_runtime(mem.hProcess, mem.client_base, mem.engine_base))
+                downloaded = true;
+            offsets_resolved = true;
         }
 
         HWND cs_hwnd = FindWindowW(nullptr, L"Counter-Strike 2");

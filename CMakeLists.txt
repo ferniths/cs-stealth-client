@@ -11,6 +11,7 @@ add_executable(StealthClient WIN32
     src/esp.cpp
     src/config.cpp
     src/gui.cpp
+    src/offsets.cpp
     src/imgui/imgui.cpp
     src/imgui/imgui_draw.cpp
     src/imgui/imgui_tables.cpp
@@ -20,4 +21,4 @@ add_executable(StealthClient WIN32
 )
 
 target_include_directories(StealthClient PRIVATE src src/imgui)
-target_link_libraries(StealthClient PRIVATE d3d11 dwmapi)
+target_link_libraries(StealthClient PRIVATE d3d11 dwmapi winhttp)
