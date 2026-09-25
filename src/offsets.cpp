@@ -332,12 +332,21 @@ static std::uintptr_t scan_module(HANDLE hProc, std::uintptr_t base, size_t size
 
     int32_t disp = 0;
     memcpy(&disp, buf.data() + pos + disp_off, 4);
-    return (std::uintptr_t)(pos + instr_len + disp);
+    long long rva = (long long)pos + instr_len + disp;
+    // The referenced global must lie inside the module — reject garbage matches
+    if (rva <= 0 || (size_t)rva >= size) return 0;
+    return (std::uintptr_t)rva;
 }
 
 // ─── Pattern-scan client.dll + engine2.dll for base offsets ────────────────
 static bool pattern_scan_base(HANDLE hProc, std::uintptr_t client, std::uintptr_t engine, size_t client_sz, size_t engine_sz) {
     bool any = false;
+
+    // Keep pre-scan values so a bad match can be reverted after validation
+    auto old_ctrl = CLIENT::dwLocalPlayerController;
+    auto old_es = CLIENT::dwGameEntitySystem;
+    auto old_w = ENGINE2::dwWindowWidth;
+    auto old_h = ENGINE2::dwWindowHeight;
 
     // dwLocalPlayerController: 48 8B 05 [disp32] 41 89 BE
     auto v = scan_module(hProc, client, client_sz, "48 8B 05 ?? ?? ?? ?? 41 89 BE", 3, 7);
@@ -350,6 +359,25 @@ static bool pattern_scan_base(HANDLE hProc, std::uintptr_t client, std::uintptr_
     // dwViewMatrix: 48 8D 0D [disp32] 48 C1 E0 06
     v = scan_module(hProc, client, client_sz, "48 8D 0D ?? ?? ?? ?? 48 C1 E0 06", 3, 7);
     if (v) { CLIENT::dwViewMatrix = v; any = true; }
+
+    // Validate scanned pointer globals: a wrong pattern match typically reads
+    // back as something that is not a plausible user-space pointer.
+    {
+        auto plausible = [](std::uintptr_t p) {
+            return p == 0 || (p > 0x10000 && p < 0x0000800000000000ULL);
+        };
+        std::uintptr_t pv = 0;
+        if (CLIENT::dwLocalPlayerController != old_ctrl) {
+            pv = 0;
+            ReadProcessMemory(hProc, (LPCVOID)(client + CLIENT::dwLocalPlayerController), &pv, sizeof(pv), nullptr);
+            if (!plausible(pv)) CLIENT::dwLocalPlayerController = old_ctrl;
+        }
+        if (CLIENT::dwGameEntitySystem != old_es) {
+            pv = 0;
+            ReadProcessMemory(hProc, (LPCVOID)(client + CLIENT::dwGameEntitySystem), &pv, sizeof(pv), nullptr);
+            if (!plausible(pv)) CLIENT::dwGameEntitySystem = old_es;
+        }
+    }
 
     // dwViewAngles via dwCSGOInput callback pattern: f2 42 0f 10 84 28 [disp32]
     // First find dwCSGOInput, then secondary — but simpler: direct pattern
@@ -364,10 +392,21 @@ static bool pattern_scan_base(HANDLE hProc, std::uintptr_t client, std::uintptr_
     v = scan_module(hProc, engine, engine_sz, "8B 05 ?? ?? ?? ?? 89 03", 2, 6);
     if (v) { ENGINE2::dwWindowHeight = v; any = true; }
 
-    // dwHighestEntityIndex: FF 81 [disp32] 48 85 D2 — disp is direct offset not RIP-rel
+    // Validate scanned window offsets by actually reading them — revert to the
+    // previous (dump) values if they don't resolve to plausible resolutions.
+    if (ENGINE2::dwWindowWidth != old_w || ENGINE2::dwWindowHeight != old_h) {
+        int w = 0, h = 0;
+        bool rw = ReadProcessMemory(hProc, (LPCVOID)(engine + ENGINE2::dwWindowWidth), &w, sizeof(w), nullptr);
+        bool rh = ReadProcessMemory(hProc, (LPCVOID)(engine + ENGINE2::dwWindowHeight), &h, sizeof(h), nullptr);
+        if (!rw || !rh || w < 100 || w > 10000 || h < 100 || h > 10000) {
+            ENGINE2::dwWindowWidth = old_w;
+            ENGINE2::dwWindowHeight = old_h;
+        }
+    }
+
+    // dwHighestEntityIndex: FF 81 [disp32] 48 85 D2 — disp is an offset into
+    // the entity system object (es-relative), not an RVA
     {
-        std::vector<int> mask;
-        auto bytes = parse_pattern("FF 81 ?? ?? ?? ?? 48 85 D2", mask);
         std::vector<uint8_t> buf(client_sz);
         SIZE_T rd = 0;
         if (ReadProcessMemory(hProc, (LPCVOID)client, buf.data(), client_sz, &rd)) {
@@ -375,8 +414,10 @@ static bool pattern_scan_base(HANDLE hProc, std::uintptr_t client, std::uintptr_
             if (pos >= 0) {
                 uint32_t off = 0;
                 memcpy(&off, buf.data() + pos + 2, 4);
-                CLIENT::dwHighestEntityIndex = off;
-                any = true;
+                if (off > 0 && off < 0x10000) {
+                    CLIENT::dwHighestEntityIndex = off;
+                    any = true;
+                }
             }
         }
     }
@@ -419,23 +460,17 @@ bool resolve_offsets() {
     return false;
 }
 
-bool resolve_offsets_runtime(void* hProc, std::uintptr_t client_base, std::uintptr_t engine_base) {
-    // Called after Memory::attach() — pattern-scan as live fallback
+bool resolve_offsets_runtime(void* hProc, std::uintptr_t client_base, std::uintptr_t engine_base,
+                              size_t client_size, size_t engine_size) {
+    // Called after Memory::attach() — scan the LIVE modules. Live code is the
+    // authoritative source; downloaded dumps can lag a game update.
     HANDLE h = (HANDLE)hProc;
     if (!h || h == INVALID_HANDLE_VALUE) return false;
+    if (!client_size || !engine_size) return false;
 
-    // Get module sizes via virtual query
-    MEMORY_BASIC_INFORMATION mbi{};
-    size_t client_sz = 0, engine_sz = 0;
-    if (VirtualQueryEx(h, (LPCVOID)client_base, &mbi, sizeof(mbi)))
-        client_sz = mbi.RegionSize;
-    if (VirtualQueryEx(h, (LPCVOID)engine_base, &mbi, sizeof(mbi)))
-        engine_sz = mbi.RegionSize;
-
-    // Cap to reasonable size (first 32MB should cover .text+.data)
-    if (client_sz > 0x2000000) client_sz = 0x2000000;
-    if (engine_sz > 0x2000000) engine_sz = 0x2000000;
-    if (!client_sz || !engine_sz) return false;
+    // Cap for safety only (modules are ~40MB)
+    size_t client_sz = client_size > 0x4000000 ? 0x4000000 : client_size;
+    size_t engine_sz = engine_size > 0x4000000 ? 0x4000000 : engine_size;
 
     if (!pattern_scan_base(h, client_base, engine_base, client_sz, engine_sz))
         return false;

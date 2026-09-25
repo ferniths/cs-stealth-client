@@ -38,14 +38,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             overlay.end_frame();
             Sleep(1000);
             if (!mem.attach()) { Sleep(100); continue; }
-            // Re-resolve on every attach: CS2 may have updated while we were detached
+            // Re-resolve every attach: CS2 may have updated while detached.
+            // Download first (schema + fallback), then ALWAYS pattern-scan
+            // after attach — live scan beats the dump when they disagree.
             downloaded = resolve_offsets();
-            offsets_resolved = downloaded;
+            offsets_resolved = false;
             continue;
         }
 
         if (!offsets_resolved) {
-            if (resolve_offsets_runtime(mem.hProcess, mem.client_base, mem.engine_base))
+            if (resolve_offsets_runtime(mem.hProcess, mem.client_base, mem.engine_base,
+                                        mem.client_size, mem.engine_size))
                 downloaded = true;
             offsets_resolved = true;
         }
@@ -99,7 +102,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             Sleep(100); continue;
         }
 
-        hud.highest = mem.read<std::uint32_t>(mem.client_base + CLIENT::dwHighestEntityIndex);
+        hud.highest = mem.read<std::uint32_t>(es + CLIENT::dwHighestEntityIndex);
         auto players = mem.read_players(es, &hud.pawns);
         hud.players = static_cast<int>(players.size());
         auto cam = mem.read_camera();

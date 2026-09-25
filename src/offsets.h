@@ -50,9 +50,11 @@ namespace SCH {
 // cache/hardcoded so the caller can run a live pattern scan after attach.
 bool resolve_offsets();
 
-// Call after Memory::attach() to pattern-scan using the attached process.
-// Returns true if pattern scan succeeded.
-bool resolve_offsets_runtime(void* hProcess, std::uintptr_t client_base, std::uintptr_t engine_base);
+// Call after Memory::attach() to pattern-scan the LIVE modules. This is the
+// authoritative source: dumps can lag a game update. Returns true if scan
+// succeeded for at least one base offset.
+bool resolve_offsets_runtime(void* hProcess, std::uintptr_t client_base, std::uintptr_t engine_base,
+                              size_t client_size, size_t engine_size);
 
 // Human-readable source of the currently loaded offsets ("github", "cache",
 // "pattern scan", "builtin", ...). For on-screen diagnostics.

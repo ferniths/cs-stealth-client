@@ -59,4 +59,6 @@ public:
     DWORD pid = 0;
     std::uintptr_t client_base = 0;
     std::uintptr_t engine_base = 0;
+    size_t client_size = 0;
+    size_t engine_size = 0;
 };

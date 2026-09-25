@@ -22,7 +22,8 @@ static DWORD find_pid(const wchar_t* name) {
     return 0;
 }
 
-static std::uintptr_t find_module(HANDLE hProc, DWORD pid, const wchar_t* name) {
+static std::uintptr_t find_module(HANDLE hProc, DWORD pid, const wchar_t* name, size_t* out_size) {
+    if (out_size) *out_size = 0;
     HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
     if (snap == INVALID_HANDLE_VALUE) return 0;
     MODULEENTRY32W me{};
@@ -30,6 +31,7 @@ static std::uintptr_t find_module(HANDLE hProc, DWORD pid, const wchar_t* name) 
     if (Module32FirstW(snap, &me)) {
         do {
             if (_wcsicmp(me.szModule, name) == 0) {
+                if (out_size) *out_size = me.modBaseSize;
                 CloseHandle(snap);
                 return reinterpret_cast<std::uintptr_t>(me.modBaseAddr);
             }
@@ -44,8 +46,8 @@ bool Memory::attach() {
     if (!pid) return false;
     hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
     if (!hProcess || hProcess == INVALID_HANDLE_VALUE) return false;
-    client_base = find_module(hProcess, pid, L"client.dll");
-    engine_base = find_module(hProcess, pid, L"engine2.dll");
+    client_base = find_module(hProcess, pid, L"client.dll", &client_size);
+    engine_base = find_module(hProcess, pid, L"engine2.dll", &engine_size);
     return client_base && engine_base;
 }
 
@@ -179,9 +181,11 @@ Player Memory::read_player(std::uintptr_t es, std::uintptr_t idx) const {
 std::vector<Player> Memory::read_players(std::uintptr_t es, int* out_pawns) const {
     std::vector<Player> out;
     int pawns = 0;
-    auto highest = read<std::uint32_t>(client_base + CLIENT::dwHighestEntityIndex);
-    if (!highest) highest = 64;
-    highest = std::min(highest, 1024u);
+    // dwGameEntitySystem_highestEntityIndex is relative to the entity system
+    // object (es), NOT an RVA into client.dll (reading client+off yields .text
+    // bytes). Sanity-clamp: a bogus count falls back to a fixed scan range.
+    auto highest = read<std::uint32_t>(es + CLIENT::dwHighestEntityIndex);
+    if (highest == 0 || highest > 4096) highest = 256;
     for (std::uintptr_t i = 1; i <= highest; ++i) {
         auto p = read_player(es, i);
         if (p.pawn) ++pawns;
