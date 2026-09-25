@@ -5,6 +5,8 @@
 #include <Windows.h>
 #include "imgui.h"
 
+HudInfo hud;
+
 static bool toggle(const char* label, bool* v) {
     bool changed = ImGui::Checkbox(label, v);
     ImGui::SameLine(ImGui::GetContentRegionAvail().x - 30.0f);
@@ -169,6 +171,10 @@ void gui_draw(Config& cfg, bool& menu_open) {
     ImGui::Separator();
     ImGui::TextDisabled("Offsets: %s  dwViewMatrix 0x%llX", offsets_source(),
                         (unsigned long long)CLIENT::dwViewMatrix);
+    ImGui::TextDisabled("ctrl %llX pawn %llX", (unsigned long long)hud.ctrl, (unsigned long long)hud.pawn);
+    ImGui::TextDisabled("es %llX hi %u ents %d/%d", (unsigned long long)hud.es, hud.highest, hud.pawns, hud.players);
+    ImGui::TextDisabled("cam %dx%d hp %d team %d vm0 %.3f",
+                        hud.cam_w, hud.cam_h, hud.local_hp, hud.local_team, hud.vm0);
 
     ImGui::End();
 }

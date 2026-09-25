@@ -76,6 +76,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         overlay.width = cs_w; overlay.height = cs_h;
 
         auto [ctrl, pawn] = mem.read_local();
+        hud = HudInfo{};
+        hud.ctrl = ctrl;
+        hud.pawn = pawn;
+        if (pawn) {
+            hud.local_hp = mem.read<std::int32_t>(pawn + SCH::m_iHealth);
+            hud.local_team = mem.read<std::uint8_t>(pawn + SCH::m_iTeamNum);
+        }
         if (!pawn) {
             overlay.begin_frame();
             if (overlay.is_open()) gui_draw(cfg, overlay.menu_open);
@@ -84,6 +91,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         }
 
         auto es = mem.read_ptr(mem.client_base + CLIENT::dwGameEntitySystem);
+        hud.es = es;
         if (!es) {
             overlay.begin_frame();
             if (overlay.is_open()) gui_draw(cfg, overlay.menu_open);
@@ -91,8 +99,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             Sleep(100); continue;
         }
 
-        auto players = mem.read_players(es);
+        hud.highest = mem.read<std::uint32_t>(mem.client_base + CLIENT::dwHighestEntityIndex);
+        auto players = mem.read_players(es, &hud.pawns);
+        hud.players = static_cast<int>(players.size());
         auto cam = mem.read_camera();
+        hud.cam_w = cam.w; hud.cam_h = cam.h;
+        hud.vm0 = cam.vm[0];
         if (cam.w < 100 || cam.h < 100) {
             overlay.begin_frame();
             if (overlay.is_open()) gui_draw(cfg, overlay.menu_open);

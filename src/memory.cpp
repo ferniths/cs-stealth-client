@@ -128,7 +128,8 @@ Player Memory::read_player(std::uintptr_t es, std::uintptr_t idx) const {
     p.health = read<std::int32_t>(pawn + SCH::m_iHealth);
     auto life = read<std::uint8_t>(pawn + SCH::m_lifeState);
     p.team = read<std::uint8_t>(pawn + SCH::m_iTeamNum);
-    if (p.team != 2 && p.team != 3) return {};
+    // Keep pawn pointer for diagnostics; health=0 keeps it out of the draw list
+    if (p.team != 2 && p.team != 3) { p.health = 0; return p; }
     p.alive = (life == 0);
     auto sn0 = read_ptr(pawn + SCH::m_pGameSceneNode);
     p.dormant = sn0 ? (read<std::uint8_t>(sn0 + SCH::m_bDormant) != 0) : false;
@@ -175,15 +176,18 @@ Player Memory::read_player(std::uintptr_t es, std::uintptr_t idx) const {
     return p;
 }
 
-std::vector<Player> Memory::read_players(std::uintptr_t es) const {
+std::vector<Player> Memory::read_players(std::uintptr_t es, int* out_pawns) const {
     std::vector<Player> out;
+    int pawns = 0;
     auto highest = read<std::uint32_t>(client_base + CLIENT::dwHighestEntityIndex);
     if (!highest) highest = 64;
     highest = std::min(highest, 1024u);
     for (std::uintptr_t i = 1; i <= highest; ++i) {
         auto p = read_player(es, i);
+        if (p.pawn) ++pawns;
         if (p.pawn && p.health > 0 && !p.dormant) out.push_back(p);
     }
+    if (out_pawns) *out_pawns = pawns;
     return out;
 }
 
