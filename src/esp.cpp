@@ -44,6 +44,24 @@ static ImU32 health_color(int hp) {
     return IM_COL32(r, g, b, 255);
 }
 
+// Dark halo underlay so lines/text stay readable on any map brightness
+static const ImU32 kHalo = IM_COL32(0, 0, 0, 160);
+
+static void halo_rect(ImDrawList* d, ImVec2 a, ImVec2 b, ImU32 col, float rounding = 0.0f) {
+    d->AddRect(a, b, kHalo, rounding, 0, 3.0f);
+    d->AddRect(a, b, col, rounding, 0, 1.5f);
+}
+
+static void halo_line(ImDrawList* d, ImVec2 a, ImVec2 b, ImU32 col, float thick = 1.5f) {
+    d->AddLine(a, b, kHalo, thick + 2.0f);
+    d->AddLine(a, b, col, thick);
+}
+
+static void shadow_text(ImDrawList* d, ImVec2 pos, ImU32 col, const char* s) {
+    d->AddText(ImVec2(pos.x + 1.0f, pos.y + 1.0f), IM_COL32(0, 0, 0, 220), s);
+    d->AddText(pos, col, s);
+}
+
 void draw_esp(Memory& mem, const Camera& cam, const std::vector<Player>& players, const Config& cfg) {
     if (!cfg.esp) return;
     ImDrawList* d = ImGui::GetBackgroundDrawList();
@@ -78,22 +96,24 @@ void draw_esp(Memory& mem, const Camera& cam, const std::vector<Player>& players
         ImU32 col = ImColor(cfg.esp_box_r/255.0f, cfg.esp_box_g/255.0f, cfg.esp_box_b/255.0f, 1.0f);
 
         if (cfg.esp_box) {
-            if (cfg.esp_box_style == 0) d->AddRect(ImVec2(x, y), ImVec2(x+wd, y+hgt), col);
-            else if (cfg.esp_box_style == 1) {
+            if (cfg.esp_box_style == 0) {
+                halo_rect(d, {x, y}, {x+wd, y+hgt}, col, 2.0f);
+            } else if (cfg.esp_box_style == 1) {
                 float c = std::max(4.0f, wd/5.0f);
-                d->AddLine({x,y},{x+c,y},col,1.5f); d->AddLine({x,y},{x,y+c},col,1.5f);
-                d->AddLine({x+wd-c,y},{x+wd,y},col,1.5f); d->AddLine({x+wd,y},{x+wd,y+c},col,1.5f);
-                d->AddLine({x,y+hgt-c},{x,y+hgt},col,1.5f); d->AddLine({x,y+hgt},{x+c,y+hgt},col,1.5f);
-                d->AddLine({x+wd-c,y+hgt},{x+wd,y+hgt},col,1.5f); d->AddLine({x+wd,y+hgt-c},{x+wd,y+hgt},col,1.5f);
+                halo_line(d, {x,y}, {x+c,y}, col);   halo_line(d, {x,y}, {x,y+c}, col);
+                halo_line(d, {x+wd-c,y}, {x+wd,y}, col); halo_line(d, {x+wd,y}, {x+wd,y+c}, col);
+                halo_line(d, {x,y+hgt-c}, {x,y+hgt}, col); halo_line(d, {x,y+hgt}, {x+c,y+hgt}, col);
+                halo_line(d, {x+wd-c,y+hgt}, {x+wd,y+hgt}, col); halo_line(d, {x+wd,y+hgt-c}, {x+wd,y+hgt}, col);
             } else {
-                d->AddRectFilled({x+1,y+1},{x+wd-1,y+hgt-1},IM_COL32(cfg.esp_box_r,cfg.esp_box_g,cfg.esp_box_b,50));
-                d->AddRect({x,y},{x+wd,y+hgt},col);
+                d->AddRectFilled({x+1,y+1},{x+wd-1,y+hgt-1},IM_COL32(cfg.esp_box_r,cfg.esp_box_g,cfg.esp_box_b,55), 2.0f);
+                halo_rect(d, {x, y}, {x+wd, y+hgt}, col);
             }
         }
 
         if (cfg.esp_health) {
             float hp_pct = std::clamp(p.health/100.0f, 0.0f, 1.0f);
-            float bx = x - 7.0f;
+            float bx = x - 8.0f;
+            d->AddRectFilled({bx-1,y-1},{bx+5,y+hgt+1}, IM_COL32(0,0,0,220)); // border
             d->AddRectFilled({bx,y},{bx+4,y+hgt},IM_COL32(25,30,40,255));
             float bh = std::max(2.0f, hgt * hp_pct);
 
@@ -112,15 +132,15 @@ void draw_esp(Memory& mem, const Camera& cam, const std::vector<Player>& players
         if (cfg.esp_name && !p.name.empty()) {
             ImVec2 ts = ImGui::CalcTextSize(p.name.c_str());
             float nx = std::max(2.0f, std::min(x+(wd-ts.x)*0.5f, disp.x-ts.x-12.0f));
-            d->AddRectFilled({nx-2,y-ts.y-6},{nx+ts.x+2,y-2},IM_COL32(10,13,18,200));
-            d->AddText({nx,y-ts.y-4},IM_COL32(255,255,255,255),p.name.c_str());
+            d->AddRectFilled({nx-3,y-ts.y-7},{nx+ts.x+3,y-1}, IM_COL32(8,10,15,215), 3.0f);
+            shadow_text(d, {nx, y-ts.y-4}, IM_COL32(240,240,245,255), p.name.c_str());
         }
 
         if (cfg.esp_distance) {
             float dist = std::sqrt((p.origin.x-cam.origin.x)*(p.origin.x-cam.origin.x)+(p.origin.y-cam.origin.y)*(p.origin.y-cam.origin.y)+(p.origin.z-cam.origin.z)*(p.origin.z-cam.origin.z));
             char buf[32]; sprintf_s(buf, "%.0fm", dist/39.37f);
             ImVec2 ts = ImGui::CalcTextSize(buf);
-            d->AddText({fsx-ts.x*0.5f, fsy+4}, IM_COL32(200,200,200,255), buf);
+            shadow_text(d, {fsx-ts.x*0.5f, fsy+4}, IM_COL32(210,210,215,255), buf);
         }
 
         if (cfg.esp_skeleton) {
@@ -130,16 +150,17 @@ void draw_esp(Memory& mem, const Camera& cam, const std::vector<Player>& players
                 if ((ba.x==0&&ba.y==0)||(bb.x==0&&bb.y==0)) continue;
                 float ax,ay,bx,by;
                 if (!w2s(cam.vm,ba,ax,ay,cam.w,cam.h)||!w2s(cam.vm,bb,bx,by,cam.w,cam.h)) continue;
-                d->AddLine({ax,ay},{bx,by},IM_COL32(255,255,255,180),1.0f);
+                halo_line(d, {ax,ay},{bx,by}, IM_COL32(245,245,248,190), 1.2f);
             }
         }
 
-        if (cfg.esp_tracer) d->AddLine({disp.x*0.5f,disp.y},{fsx,fsy},IM_COL32(255,255,255,80),1.0f);
-        if (cfg.esp_snapline) d->AddLine({disp.x*0.5f,disp.y*0.75f},{fsx,fsy},IM_COL32(155,95,255,100),1.0f);
+        if (cfg.esp_tracer) halo_line(d, {disp.x*0.5f,disp.y},{fsx,fsy}, IM_COL32(235,235,235,90), 1.2f);
+        if (cfg.esp_snapline) halo_line(d, {disp.x*0.5f,disp.y*0.75f},{fsx,fsy}, IM_COL32(165,110,255,120), 1.2f);
         if (cfg.esp_head_dot) {
             float head_r = std::max(3.0f, hgt * 0.035f);
-            d->AddCircleFilled({hsx,hsy}, head_r, IM_COL32(255,255,255,200));
-            d->AddCircle({hsx,hsy}, head_r, IM_COL32(155,95,255,160), 0, 1.0f);
+            d->AddCircleFilled({hsx,hsy}, head_r + 1.5f, IM_COL32(0,0,0,180));
+            d->AddCircleFilled({hsx,hsy}, head_r, IM_COL32(250,250,252,220));
+            d->AddCircle({hsx,hsy}, head_r, IM_COL32(165,110,255,170), 0, 1.5f);
         }
 
         if (cfg.esp_weapon && p.weapon_id > 0) {
@@ -147,8 +168,8 @@ void draw_esp(Memory& mem, const Camera& cam, const std::vector<Player>& players
             if (wn[0]) {
                 ImVec2 ts = ImGui::CalcTextSize(wn);
                 float wx = std::max(2.0f, std::min(x+(wd-ts.x)*0.5f, disp.x-ts.x-12.0f));
-                d->AddRectFilled({wx-2,y+hgt+2},{wx+ts.x+2,y+hgt+2+ts.y+4},IM_COL32(10,13,18,200));
-                d->AddText({wx,y+hgt+4},IM_COL32(200,200,200,255),wn);
+                d->AddRectFilled({wx-3,y+hgt+3},{wx+ts.x+3,y+hgt+3+ts.y+6}, IM_COL32(8,10,15,215), 3.0f);
+                shadow_text(d, {wx, y+hgt+6}, IM_COL32(205,205,210,255), wn);
             }
         }
     }

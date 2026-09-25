@@ -61,6 +61,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             Sleep(500); continue;
         }
 
+        // Only render ESP while CS2 is the foreground window — tabbed out,
+        // the overlay frame stays empty (color-keyed = fully transparent).
+        // Menu stays accessible; heavy memory reads are skipped too.
+        {
+            HWND fg = GetForegroundWindow();
+            DWORD fg_pid = 0;
+            if (fg) GetWindowThreadProcessId(fg, &fg_pid);
+            if (!fg_pid || fg_pid != mem.pid) {
+                overlay.begin_frame();
+                if (overlay.is_open()) gui_draw(cfg, overlay.menu_open);
+                overlay.end_frame();
+                Sleep(50); continue;
+            }
+        }
+
         RECT cs_rect{};
         if (!GetClientRect(cs_hwnd, &cs_rect)) {
             overlay.begin_frame();
