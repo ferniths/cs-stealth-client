@@ -50,7 +50,7 @@ public:
     std::uintptr_t entity_from_index(std::uintptr_t es, std::uintptr_t idx) const;
     std::uintptr_t entity_from_handle(std::uintptr_t h) const;
     std::pair<std::uintptr_t, std::uintptr_t> read_local() const;
-    Player read_player(std::uintptr_t es, std::uintptr_t idx) const;
+    Player read_player(std::uintptr_t pawn, std::uintptr_t idx) const;
     std::vector<Player> read_players(std::uintptr_t es, int* out_pawns = nullptr) const;
     Camera read_camera() const;
     std::array<float, 16> read_view_matrix() const;

@@ -120,9 +120,8 @@ std::pair<std::uintptr_t, std::uintptr_t> Memory::read_local() const {
     return {ctrl, entity_from_handle(hpawn)};
 }
 
-Player Memory::read_player(std::uintptr_t es, std::uintptr_t idx) const {
+Player Memory::read_player(std::uintptr_t pawn, std::uintptr_t idx) const {
     Player p;
-    auto pawn = entity_from_index(es, idx);
     if (!pawn) return p;
 
     p.index = static_cast<int>(idx);
@@ -181,14 +180,21 @@ Player Memory::read_player(std::uintptr_t es, std::uintptr_t idx) const {
 std::vector<Player> Memory::read_players(std::uintptr_t es, int* out_pawns) const {
     std::vector<Player> out;
     int pawns = 0;
-    // dwGameEntitySystem_highestEntityIndex is relative to the entity system
-    // object (es), NOT an RVA into client.dll (reading client+off yields .text
-    // bytes). Sanity-clamp: a bogus count falls back to a fixed scan range.
-    auto highest = read<std::uint32_t>(es + CLIENT::dwHighestEntityIndex);
-    if (highest == 0 || highest > 4096) highest = 256;
-    for (std::uintptr_t i = 1; i <= highest; ++i) {
-        auto p = read_player(es, i);
-        if (p.pawn) ++pawns;
+    // Fixed scan range. dwGameEntitySystem_highestEntityIndex (es+0x2120) does
+    // NOT cover all player slots — measured 181 while players sat at idx 285-347,
+    // so capping the loop by it drops every player. Chunk pointers are hoisted:
+    // all slots < 1024 live in chunks 0-1.
+    constexpr std::uintptr_t kMaxIdx = 1024;
+    std::uintptr_t chunks[2] = {0, 0};
+    chunks[0] = read_ptr(es + CLIENT::dwChunkPointers);
+    chunks[1] = read_ptr(es + CLIENT::dwChunkPointers + 8);
+    for (std::uintptr_t i = 1; i <= kMaxIdx; ++i) {
+        auto& cp = chunks[i >> 9];
+        if (!cp) continue;
+        auto pawn = read_ptr(cp + CLIENT::dwSlotStride * (i & 0x1FF));
+        if (!pawn) continue;
+        ++pawns;
+        auto p = read_player(pawn, i);
         if (p.pawn && p.health > 0 && !p.dormant) out.push_back(p);
     }
     if (out_pawns) *out_pawns = pawns;

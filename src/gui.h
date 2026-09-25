@@ -9,7 +9,7 @@ struct HudInfo {
     std::uintptr_t ctrl = 0;   // local controller ptr
     std::uintptr_t pawn = 0;   // local pawn ptr
     std::uintptr_t es = 0;     // entity system ptr
-    unsigned highest = 0;      // raw dwHighestEntityIndex value
+    unsigned highest = 0;      // raw es+0x2120 value (diagnostic only; not the loop cap)
     int pawns = 0;             // entity slots with non-null pawn
     int players = 0;           // players after filters (what ESP draws)
     int cam_w = 0, cam_h = 0;
