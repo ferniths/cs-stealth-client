@@ -45,10 +45,15 @@ namespace SCH {
     extern std::uintptr_t m_bDormant;
 }
 
-// Resolve offsets at launch. Tries: cache -> download -> pattern scan -> hardcoded.
-// Returns true if dynamic resolution succeeded (download or pattern scan).
+// Resolve offsets at launch. Tries: download -> cache -> hardcoded.
+// Returns true only if a fresh GitHub download was applied; false for
+// cache/hardcoded so the caller can run a live pattern scan after attach.
 bool resolve_offsets();
 
 // Call after Memory::attach() to pattern-scan using the attached process.
 // Returns true if pattern scan succeeded.
 bool resolve_offsets_runtime(void* hProcess, std::uintptr_t client_base, std::uintptr_t engine_base);
+
+// Human-readable source of the currently loaded offsets ("github", "cache",
+// "pattern scan", "builtin", ...). For on-screen diagnostics.
+const char* offsets_source();

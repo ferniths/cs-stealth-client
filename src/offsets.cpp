@@ -16,20 +16,20 @@
 
 using json = nlohmann::json;
 
-// ─── Hardcoded fallback (last known good) ───────────────────────────────────
+// ─── Hardcoded fallback (last known good: 2026-09-25) ──────────────────────
 namespace CLIENT {
-    std::uintptr_t dwLocalPlayerController = 0x25324D8;
-    std::uintptr_t dwLocalPlayerPawn       = 0x255B598;
-    std::uintptr_t dwGameEntitySystem       = 0x2710038;
-    std::uintptr_t dwViewAngles             = 0x2571108;
-    std::uintptr_t dwViewMatrix             = 0x25608E0;
+    std::uintptr_t dwLocalPlayerController = 0x2535598;
+    std::uintptr_t dwLocalPlayerPawn       = 0x255E658;
+    std::uintptr_t dwGameEntitySystem       = 0x27130E8;
+    std::uintptr_t dwViewAngles             = 0x25741C8;
+    std::uintptr_t dwViewMatrix             = 0x25639A0;
     std::uintptr_t dwHighestEntityIndex     = 0x2120;
     std::uintptr_t dwChunkPointers          = 0x10;
     std::uintptr_t dwSlotStride             = 0x70;
 }
 namespace ENGINE2 {
-    std::uintptr_t dwWindowWidth            = 0x91E4D8;
-    std::uintptr_t dwWindowHeight           = 0x91E4DC;
+    std::uintptr_t dwWindowWidth            = 0x91F540;
+    std::uintptr_t dwWindowHeight           = 0x91F544;
 }
 namespace SCH {
     std::uintptr_t m_pGameSceneNode         = 0x330;
@@ -196,25 +196,29 @@ static void save_cache() {
 // ─── Apply downloaded offsets.json (a2x/cs2-dumper format) ──────────────────
 static bool apply_offsets_json(const std::string& body) {
     json j;
-    try { j = json::parse(body); } catch (...) { return false; }
-    if (!j.contains("client.dll") || !j.contains("engine2.dll")) return false;
+    try {
+        j = json::parse(body);
+        if (!j.contains("client.dll") || !j.contains("engine2.dll")) return false;
 
-    auto& c = j["client.dll"];
-    if (!c.contains("dwLocalPlayerController") || !c.contains("dwViewMatrix")) return false;
+        auto& c = j["client.dll"];
+        if (!c.contains("dwLocalPlayerController") || !c.contains("dwViewMatrix")) return false;
 
-    CLIENT::dwLocalPlayerController = c["dwLocalPlayerController"];
-    CLIENT::dwGameEntitySystem       = c.contains("dwGameEntitySystem") ? c["dwGameEntitySystem"].get<std::uintptr_t>()
-                                      : c.contains("dwEntityList")      ? c["dwEntityList"].get<std::uintptr_t>() : CLIENT::dwGameEntitySystem;
-    CLIENT::dwViewAngles             = c["dwViewAngles"];
-    CLIENT::dwViewMatrix             = c["dwViewMatrix"];
-    if (c.contains("dwLocalPlayerPawn")) CLIENT::dwLocalPlayerPawn = c["dwLocalPlayerPawn"];
-    if (c.contains("dwGameEntitySystem_highestEntityIndex"))
-        CLIENT::dwHighestEntityIndex = c["dwGameEntitySystem_highestEntityIndex"];
+        CLIENT::dwLocalPlayerController = c["dwLocalPlayerController"];
+        CLIENT::dwViewMatrix             = c["dwViewMatrix"];
+        if (c.contains("dwViewAngles"))   CLIENT::dwViewAngles = c["dwViewAngles"];
+        if (c.contains("dwLocalPlayerPawn")) CLIENT::dwLocalPlayerPawn = c["dwLocalPlayerPawn"];
+        if (c.contains("dwGameEntitySystem")) CLIENT::dwGameEntitySystem = c["dwGameEntitySystem"];
+        else if (c.contains("dwEntityList"))  CLIENT::dwGameEntitySystem = c["dwEntityList"];
+        if (c.contains("dwGameEntitySystem_highestEntityIndex"))
+            CLIENT::dwHighestEntityIndex = c["dwGameEntitySystem_highestEntityIndex"];
 
-    auto& e = j["engine2.dll"];
-    if (e.contains("dwWindowWidth"))  ENGINE2::dwWindowWidth  = e["dwWindowWidth"];
-    if (e.contains("dwWindowHeight")) ENGINE2::dwWindowHeight = e["dwWindowHeight"];
-    return true;
+        auto& e = j["engine2.dll"];
+        if (e.contains("dwWindowWidth"))  ENGINE2::dwWindowWidth  = e["dwWindowWidth"];
+        if (e.contains("dwWindowHeight")) ENGINE2::dwWindowHeight = e["dwWindowHeight"];
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 // ─── Apply downloaded client_dll.json (schema classes) ─────────────────────
@@ -225,8 +229,10 @@ static bool apply_schema_json(const std::string& body) {
 
     auto& classes = j["client.dll"]["classes"];
     auto get = [&](const char* cls, const char* field) -> std::uintptr_t {
-        if (classes.contains(cls) && classes[cls].contains("fields") && classes[cls]["fields"].contains(field))
-            return classes[cls]["fields"][field].get<std::uintptr_t>();
+        try {
+            if (classes.contains(cls) && classes[cls].contains("fields") && classes[cls]["fields"].contains(field))
+                return classes[cls]["fields"][field].get<std::uintptr_t>();
+        } catch (...) {}
         return 0;
     };
 
@@ -258,12 +264,19 @@ static bool apply_schema_json(const std::string& body) {
         {"CGameSceneNode",          "m_bDormant",             &SCH::m_bDormant},
     };
 
+    // Stage first: only commit if most fields resolved, so a renamed class
+    // can't leave a mix of old and new schema values behind.
+    std::vector<std::uintptr_t> vals(sizeof(map) / sizeof(map[0]));
     int found = 0;
-    for (auto& m : map) {
-        auto v = get(m.cls, m.field);
-        if (v != 0) { *m.dst = v; ++found; }
+    for (size_t i = 0; i < vals.size(); ++i) {
+        vals[i] = get(map[i].cls, map[i].field);
+        if (vals[i] != 0) ++found;
     }
-    return found >= 15; // most must resolve
+    if (found < 15) return false; // most must resolve
+
+    for (size_t i = 0; i < vals.size(); ++i)
+        if (vals[i] != 0) *map[i].dst = vals[i];
+    return true;
 }
 
 // ─── Pattern scanner (fallback if download fails) ───────────────────────────
@@ -376,35 +389,33 @@ static bool pattern_scan_base(HANDLE hProc, std::uintptr_t client, std::uintptr_
 // The hardcoded SCH:: values serve as fallback here.
 
 // ─── Public API ─────────────────────────────────────────────────────────────
-bool resolve_offsets() {
-    // 1. Try cache first (fast, offline)
-    // Actually: try download first for freshness, fall back to cache
+static const char* g_source = "builtin";
+const char* offsets_source() { return g_source; }
 
-    // 2. Try download from a2x/cs2-dumper
+bool resolve_offsets() {
+    // 1. Try download from a2x/cs2-dumper (freshest, survives CS2 updates)
     std::string offsets_body, schema_body;
     bool got_offsets = http_get(L"https://raw.githubusercontent.com/a2x/cs2-dumper/main/output/offsets.json", offsets_body);
     bool got_schema  = http_get(L"https://raw.githubusercontent.com/a2x/cs2-dumper/main/output/client_dll.json", schema_body);
 
-    bool dynamic = false;
+    bool off_ok  = got_offsets && apply_offsets_json(offsets_body);
+    bool sch_ok  = got_schema  && apply_schema_json(schema_body);
 
-    if (got_offsets && apply_offsets_json(offsets_body)) {
-        dynamic = true;
-    }
-    if (got_schema && apply_schema_json(schema_body)) {
-        dynamic = true;
-    }
-
-    if (dynamic) {
+    if (off_ok || sch_ok) {
+        g_source = (off_ok && sch_ok) ? "github" : "github (partial)";
         save_cache();
-        return true;
+        return off_ok; // base offsets fresh -> no pattern scan needed
     }
 
-    // 3. Download failed — try cache
+    // 2. Download failed — try cache (may be stale after a CS2 update,
+    //    so return false and let the caller pattern-scan after attach)
     if (load_cache()) {
-        return true; // cached offsets are still valid dynamic values
+        g_source = "cache";
+        return false;
     }
 
-    // 4. Everything failed — hardcoded fallback already loaded
+    // 3. Everything failed — hardcoded fallback already loaded
+    g_source = "builtin";
     return false;
 }
 
@@ -426,5 +437,10 @@ bool resolve_offsets_runtime(void* hProc, std::uintptr_t client_base, std::uintp
     if (engine_sz > 0x2000000) engine_sz = 0x2000000;
     if (!client_sz || !engine_sz) return false;
 
-    return pattern_scan_base(h, client_base, engine_base, client_sz, engine_sz);
+    if (!pattern_scan_base(h, client_base, engine_base, client_sz, engine_sz))
+        return false;
+
+    g_source = "pattern scan";
+    save_cache();
+    return true;
 }

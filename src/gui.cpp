@@ -1,5 +1,6 @@
 #include "gui.h"
 #include "config.h"
+#include "offsets.h"
 #define NOMINMAX
 #include <Windows.h>
 #include "imgui.h"
@@ -164,6 +165,10 @@ void gui_draw(Config& cfg, bool& menu_open) {
 
         ImGui::EndTabBar();
     }
+
+    ImGui::Separator();
+    ImGui::TextDisabled("Offsets: %s  dwViewMatrix 0x%llX", offsets_source(),
+                        (unsigned long long)CLIENT::dwViewMatrix);
 
     ImGui::End();
 }

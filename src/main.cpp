@@ -38,7 +38,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             overlay.end_frame();
             Sleep(1000);
             if (!mem.attach()) { Sleep(100); continue; }
-            if (!downloaded) offsets_resolved = false;
+            // Re-resolve on every attach: CS2 may have updated while we were detached
+            downloaded = resolve_offsets();
+            offsets_resolved = downloaded;
             continue;
         }
 
